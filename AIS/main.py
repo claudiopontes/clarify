@@ -26,7 +26,7 @@ def init_db():
         ''')
         cursor.execute(''' 
             CREATE TABLE IF NOT EXISTS selic(
-                        mes TEXT PRIMAY KEY,
+                        mes TEXT PRIMARY KEY,
                         selic_diaria REAL
                         )
         ''')
@@ -188,6 +188,42 @@ def graficos():
             </body>
         </html>
     ''', grafico1 = graph_html_1, grafico2 = graph_html_2)
+
+# Rota para editar a tabela de inadimplencia
+@app.route('/editar_inadimplencia', methods=['POST', 'GET'])
+def editar_inadimplencia():
+    # Bloco que será carregado apenas quando receber o posto
+    if request.method == 'POST':
+        mes = request.form.get('campo_mes')
+        novo_valor = request.form.get('campo_valor')
+        try:
+            novo_valor = float(novo_valor)
+        except:
+            return jsonify({'Erro':'Valor Inválido'})
+        
+        # atualizar os dados do banco
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE inadimplencia SET inadimplencia = ? WHERE mes = ?", (novo_valor, mes))
+            conn.commit()
+        return jsonify({'Mensagem':f'Dados do mês {mes} atualizado com sucesso '})
+    # Bloco que será carregado a primeira vez que a pagina abrir (sem receber o pos)
+    return render_template_string(''' 
+        <h1> Editar Inadimplencia</h1>
+        <form method = "POST" action = '/editar_inadimplencia'>
+            <label>Mês (AAAA-MM):</label>
+            <input type="text" name="campo_mes" required><br>
+                                  
+            <label> Novo valor de Inadimplencia (%):</label>
+            <input type="text" name="campo_valor" required><br>
+                                  
+            <input type="submit" value="Atualizar dados">
+        </form>     
+        <br><br>
+        <h1><a href='/'>Voltar</a></h1>                   
+
+    '''
+    )
 
 if __name__ == '__main__':
     init_db()
