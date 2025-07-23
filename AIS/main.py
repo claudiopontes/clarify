@@ -55,6 +55,7 @@ def index():
         <a href="/consultar"> Consultar Dados</a><br>
         <a href="/graficos"> Visualizar Gráficos</a><br>
         <a href="/editar_inadimplencia"> Editar dados de Inadimplencia</a><br>
+        <a href="/editar_selic"> Editar Taxas da Selic</a><br>
         <a href="/correlacao"> Analisar a Correlação</a><br>
     ''')
 
@@ -161,6 +162,7 @@ def graficos():
     return render_template_string('''
         <html>
             <head>
+                <meta charset='UTF-8'>
                 <title>Gráficos Econômicos</title>
                 <style>
                     .container {
@@ -207,7 +209,7 @@ def editar_inadimplencia():
             cursor = conn.cursor()
             cursor.execute("UPDATE inadimplencia SET inadimplencia = ? WHERE mes = ?", (novo_valor, mes))
             conn.commit()
-        return jsonify({'Mensagem':f'Dados do mês {mes} atualizado com sucesso '})
+        return jsonify({'Mensagem':f'Dados do mes {mes} atualizado com sucesso !'})
     # Bloco que será carregado a primeira vez que a pagina abrir (sem receber o pos)
     return render_template_string(''' 
         <h1> Editar Inadimplencia</h1>
@@ -226,9 +228,51 @@ def editar_inadimplencia():
     '''
     )
 
+# Rota para editar a tabela de selic
+@app.route('/editar_selic', methods=['POST', 'GET'])
+def editar_selic():
+    # Bloco que será carregado apenas quando receber o posto
+    if request.method == 'POST':
+        mes = request.form.get('campo_mes')
+        novo_valor = request.form.get('campo_valor')
+        try:
+            novo_valor = float(novo_valor)
+        except:
+            return jsonify({'Erro':'Valor Inválido'})
+        
+        # atualizar os dados do banco
+        with sqlite3.connect(DB_PATH) as conn:
+            cursor = conn.cursor()
+            cursor.execute("UPDATE selic SET selic_diaria = ? WHERE mes = ?", (novo_valor, mes))
+            conn.commit()
+        return jsonify({'Mensagem':f'Dados do mes {mes} atualizado com sucesso '})
+    # Bloco que será carregado a primeira vez que a pagina abrir (sem receber o pos)
+    return render_template_string(''' 
+        <h1> Editar Taxa Selic</h1>
+        <form method = "POST" action = '/editar_selic'>
+            <label>Mês (AAAA-MM):</label>
+            <input type="text" name="campo_mes" required><br>
+                                  
+            <label> Novo valor da taxa (%):</label>
+            <input type="text" name="campo_valor" required><br>
+                                  
+            <input type="submit" value="Atualizar dados">
+        </form>     
+        <br><br>
+        <h1><a href='/'>Voltar</a></h1>                   
+
+    '''
+    )
+
 #@app.route('/correlacao', methods=['POST', 'GET'])
 #def correlacao():
 
 if __name__ == '__main__':
     init_db()
-    app.run(debug=True)
+    app.run(
+        host=config.FLASK_HOST,
+        port=config.FLASK_PORT, 
+        debug=config.FLASK_DEBUG,  
+        threaded=config.FLASK_THREADED,
+        use_reloader=config.FLASK_USE_RELOADER
+        )
