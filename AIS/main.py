@@ -184,7 +184,8 @@ def graficos():
                 </div>
             </head>
             <body>
-                                  
+                                  <br><br>
+        <h1><a href='/'>Voltar</a></h1>            
             </body>
         </html>
     ''', grafico1 = graph_html_1, grafico2 = graph_html_2)
