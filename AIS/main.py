@@ -8,11 +8,12 @@ import dash
 from dash import Dash, html, dcc
 import plotly.graph_objects as go
 import numpy as np  
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
 
 app = Flask(__name__)
 
 DB_PATH = config.DB_PATH
-
 
 # Função para inicializar o banco de dados SQL
 def init_db():
@@ -224,6 +225,9 @@ def editar_inadimplencia():
 
     '''
     )
+
+#@app.route('/correlacao', methods=['POST', 'GET'])
+#def correlacao():
 
 if __name__ == '__main__':
     init_db()
