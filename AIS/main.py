@@ -4,6 +4,10 @@ import pandas as pd
 import sqlite3
 import os 
 from flask import Flask, request, jsonify, render_template_string
+import dash 
+from dash import Dash, html, dcc
+import plotly.graph_objects as go
+import numpy as np  
 
 app = Flask(__name__)
 
@@ -16,13 +20,13 @@ def init_db():
         cursor = conn.cursor()
         cursor.execute(''' 
             CREATE TABLE IF NOT EXISTS inadimplencia(
-                        mes TEXT PRIMATY KEY,
+                        mes TEXT PRIMARY KEY,
                         inadimplencia REAL
                         )
         ''')
         cursor.execute(''' 
             CREATE TABLE IF NOT EXISTS selic(
-                        mes TEXT PRIMATY KEY,
+                        mes TEXT PRIMAY KEY,
                         selic_diaria REAL
                         )
         ''')
@@ -81,7 +85,7 @@ def upload():
     # armazenar no banco de dados as informações após limpeza
     with sqlite3.connect(DB_PATH) as conn:
         inad_mensal.to_sql('inadimplencia', conn, if_exists='replace', index=False)
-        inad_mensal.to_sql('selic', conn, if_exists='replace', index=False)
+        selic_mensal.to_sql('selic', conn, if_exists='replace', index=False)
     return jsonify({'Mensagem':'Dados inseridos com sucesso!'})
 
 @app.route('/consultar', methods=['POST', 'GET'])
@@ -109,6 +113,81 @@ def consultar():
         <br>
         <h1><a href='/'>Voltar</a></h1>
     ''')
+
+@app.route('/graficos')
+def graficos():
+    with sqlite3.connect(DB_PATH) as conn:
+        inad_df = pd.read_sql_query('SELECT * FROM inadimplencia', conn)
+        selic_df = pd.read_sql_query('SELECT * FROM selic', conn)
+
+    # Verifica se os DataFrames estão vazios
+    if inad_df.empty or selic_df.empty:
+        return jsonify({'Erro': 'Nenhum dado encontrado para plotar os gráficos.'})
+
+    # Cria os gráficos
+    fig1 = go.Figure()
+    fig1.add_trace(go.Scatter(
+        x=inad_df['mes'],
+        y=inad_df['inadimplencia'],
+        mode='lines+markers',
+        name='Inadimplencia'
+    ))
+    fig2 = go.Figure()
+    fig2.add_trace(go.Scatter(
+        x=selic_df['mes'],
+        y=selic_df['selic_diaria'],
+        mode='lines+markers',
+        name='Selic'
+    ))
+
+    # principais templates ggplotly, plotly_dark, plotly_white, seaborn, simple_white, presentation, ygridoff, gridon, none
+    fig1.update_layout(
+        title='Evolução da Inadimplência',
+        xaxis_title='Mês',
+        yaxis_title='(%)',
+        template='plotly_dark'
+    )
+    fig2.update_layout(
+        title='Média Mensal Selic',
+        xaxis_title='Mês',
+        yaxis_title='Taxa (%)',
+        template='plotly_dark'
+    )
+
+    # monta HTML para o gráfico
+    graph_html_1 = fig1.to_html(full_html=False, include_plotlyjs='cdn')
+    graph_html_2 = fig2.to_html(full_html=False, include_plotlyjs='cdn')   
+    return render_template_string('''
+        <html>
+            <head>
+                <title>Gráficos Econômicos</title>
+                <style>
+                    .container {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                    }
+                    .graph {
+                        width: 48%;
+                        flex-wrap: wrap;
+                    }                
+                </style>
+                <h1 style="color:green"> Gráficos Econômicos </h1>
+                <div class="container">
+                    <div class="graph"> 
+                        {{ grafico1 | safe }}  
+                    </div>
+                    &nbsp;
+                    <div class="graph">
+                        {{ grafico2 | safe }}                  
+                    </div>
+                </div>
+            </head>
+            <body>
+                                  
+            </body>
+        </html>
+    ''', grafico1 = graph_html_1, grafico2 = graph_html_2)
 
 if __name__ == '__main__':
     init_db()
