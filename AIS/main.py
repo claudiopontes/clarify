@@ -57,6 +57,7 @@ def index():
         <a href="/editar_inadimplencia"> Editar dados de Inadimplencia</a><br>
         <a href="/editar_selic"> Editar Taxas da Selic</a><br>
         <a href="/correlacao"> Analisar a Correlação</a><br>
+        <a href="/insights_3d"> Gráficos 3D</a>
     ''')
 
 
@@ -264,8 +265,249 @@ def editar_selic():
     '''
     )
 
-#@app.route('/correlacao', methods=['POST', 'GET'])
-#def correlacao():
+@app.route('/correlacao', methods=['POST', 'GET'])
+def correlacao():
+    with sqlite3.connect(DB_PATH) as conn:
+        inad_df = pd.read_sql_query('SELECT * FROM inadimplencia', conn)
+        selic_df = pd.read_sql_query('SELECT * FROM selic', conn)
+
+    # Verifica se os DataFrames estão vazios
+    if inad_df.empty or selic_df.empty:
+        return jsonify({'Erro': 'Nenhum dado encontrado para análise de correlação.'})
+
+    # Merge dos DataFrames
+    merged = pd.merge(inad_df, selic_df, on='mes')
+
+    # Calcular a correlação
+    correl = merged['inadimplencia'].corr(merged['selic_diaria'])
+
+    # regressão linear
+    x = merged['selic_diaria']
+    y = merged['inadimplencia']
+    m, b = np.polyfit(y, x, 1)
+
+    # Plotar a regressão linear
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=y,
+        mode='markers',
+        name='Inadimplência x Selic',
+        marker=dict(
+                color='rgba(0, 123, 255, 0.8)', size=12,  line=dict(color='white', width=2), symbol='circle'
+            ),
+        hovertemplate='SELIC: %{x:.2f}% <br>Inadimplência: %{y:.2f}% <extra></extra>'
+    ))
+    fig.add_trace(go.Scatter(
+        x=x,
+        y=m*x + b,
+        mode='lines',
+        name='Linha de Tendência',
+        line=dict(color='rgba(220, 53, 69, 1)', width=4, dash='dot')
+        )
+    )
+    fig.update_layout(
+        title={'text': f'<b>Correlação entre SELIC e Inadimplência<b><br><span stype="font-size:16px">Coeficiente de Correlação: {correl:.2f} </span>',
+               'x':0.5, 
+               'y':0.95,
+               'xanchor': 'center',
+               'yanchor': 'top'   
+               },
+        xaxis_title=dict(text = 'SELIC Média Mensal (%)',
+                   font = dict(size=18, family = 'Arial', color='gray')
+        ),
+        yaxis_title=dict(text = 'Inadimplência (%)',
+                   font = dict(size=18, family = 'Arial', color='gray')
+        ),
+        xaxis=dict(
+            tickfont=dict(size=14, family='Arial', color='black'),
+            gridcolor='lightgray'
+        ),
+        yaxis=dict(
+            tickfont=dict(size=14, family='Arial', color='black'),
+            gridcolor='lightgray'
+        ),
+        plot_bgcolor='#f8f9fa',
+        paper_bgcolor='white',
+        font =dict(size=14, family='Arial', color='black'),
+        legend=dict(
+            orientation='h',
+            yanchor='bottom',
+            xanchor='center',
+            y=1.05,
+            x=0.5,
+            bordercolor='white',
+            borderwidth=0
+        ),
+        margin=dict(l=60, r=60, t=120, b=60)
+    )
+
+    graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    return render_template_string('''
+        <html>
+            <head>
+                <title> Correlação entre Inadimplência e Selic </title>
+                <style>
+                    body { font-family: Arial, sans-serif; 
+                    background-color: #ffffff; 
+                    color: #333; 
+                    }
+                    .container { width: 90%; 
+                    margin: auto; 
+                    text-align: center; 
+                    }
+                    h1 { margin-top: 40px; 
+                    }
+                    a { text-decoration: none; 
+                    color: #007bff; 
+                    }
+                    a:hover { text-decoration: underline; 
+                    }
+                </style>
+            </head>
+            <body>
+            <div class="container">
+                <h1>Correlação entre SELIC e Inadimplência</h1>
+                <div>{{graph|safe}}</div>
+                <br
+                <div>
+                <h1><a href="/">Voltar</a></h1>
+                </div>
+            </div>
+            </body>
+        </html>
+    ''', graph=graph_html)
+
+@app.route('/insights_3d')
+def insights_3d():
+    with sqlite3.connect(DB_PATH) as conn:
+        inad_df = pd.read_sql_query('SELECT * FROM inadimplencia', conn)
+        selic_df = pd.read_sql_query('SELECT * FROM selic', conn)
+
+    # Verifica se os DataFrames estão vazios
+    if inad_df.empty or selic_df.empty:
+        return jsonify({'Erro': 'Nenhum dado encontrado para análise 3D.'})
+
+    # Merge dos DataFrames
+    merged = pd.merge(inad_df, selic_df, on='mes').sort_values('mes')
+    merged['mes_idx'] = range(len(merged))
+
+    # tendencia de inadimplencia (dirença mes a mes)
+    merged['tend_inad'] = merged['inadimplencia'].diff().fillna(0)
+    trend_color = ['subiu' if x > 0 else 'caiu' if x < 0 else 'estável' for x in merged['tend_inad']]
+
+    # Derivadas Discretas
+    merged['var_inad'] = merged['inadimplencia'].diff().fillna(0)
+    merged['var_selic'] = merged['selic_diaria'].diff().fillna(0)
+
+    #clustering
+    features = merged[['selic_diaria','inadimplencia']].copy()
+    scaler = StandardScaler()
+    scaler_features = scaler.fit_transform(features)
+
+    kmeans = KMeans(n_clusters=3, random_state=42, n_init=10)
+    merged['cluster'] = kmeans.fit_predict(scaler_features)
+
+    # Plano de Regressão 3D
+    X = merged[['mes_idx', 'selic_diaria']].values 
+    Y = merged['inadimplencia'].values
+    A = np.c_[X, np.ones(X.shape[0])]
+    coeffs, _, _, _ = np.linalg.lstsq(A, Y, rcond = None)
+
+    # Malha do Plano 3D
+    xi = np.linspace(merged['mes_idx'].min(), merged['mes_idx'].max(), 30)
+    yi = np.linspace(merged['selic_diaria'].min(), merged['selic_diaria'].max())
+    xi, yi = np.meshgrid(xi, yi)
+    zi = coeffs[0] * xi + coeffs[1] * yi + coeffs[2]
+
+    # montar grafico de dispersao 
+    scatter = go.Scatter3d(
+        x=merged['mes_idx'],
+        y=merged['selic_diaria'],
+        z=merged['inadimplencia'],
+        mode='markers',
+        marker=dict(
+            size=8,
+            color=merged['cluster'],  # cores por cluster
+            colorscale='Viridis',
+            opacity=0.9
+        ),
+        text=[
+            f"Mês: {m}<br>Inadimplência: {z:.2f}%<br>SELIC: {y:.2f}%<br>Var Inad: {vi:.2f}<br>Var SELIC: {vs:.2f}<br>Tendência: {t}"
+            for m, z, y, vi, vs, t in zip(
+                merged['mes'], merged['inadimplencia'], merged['selic_diaria'],
+                merged['var_inad'], merged['var_selic'], trend_color
+            )
+        ],
+        hovertemplate = '%{text}<extra></extra>'
+    )
+
+    # Superfície do plano de regressão
+    surface = go.Surface(
+        x = xi, 
+        y = yi, 
+        z = zi,
+        showscale = False,
+        colorscale = 'Reds',
+        opacity = 0.5,
+        name = 'Plano de Regressão'
+    )
+
+    fig = go.Figure(data=[scatter,surface])
+    fig.update_layout(
+        scene=dict(
+            xaxis=dict(
+                title='Tempo (Meses)',
+                tickvals=merged['mes_idx'],
+                ticktext=merged['mes']
+            ),
+            yaxis=dict(title='SELIC (%)'),
+            zaxis=dict(title='Inadimplência (%)')
+        ),
+        title="Insights Econômicos em 3D com Tendência, Derivadas e Clustering",
+        margin=dict(l=0, r=0, b=0, t=50),
+        height=800
+    )
+    graph_html = fig.to_html(full_html=False, include_plotlyjs='cdn')
+    
+    return render_template_string(''' 
+        <html>
+            <head>
+                <title> Insights Economicos 3D ☻ </title>
+                <style>
+                    body { font-family: Arial, sans-serif; 
+                    background-color: #f8f9fa; 
+                    color: #222; 
+                    text-align: center;
+                    }
+                    .container { width: 95%; 
+                    margin: auto; 
+                    }
+                    h1 { margin-top: 40px; 
+                    }
+                    a { text-decoration: none; 
+                    color: #007bff; 
+                    }
+                    a:hover { text-decoration: underline; 
+                    }
+                </style>
+            </head> 
+            <body>
+                <div class="container">
+                    <h1> Gráfico 3D com Insights Economicos</h1>
+                    <p>Analise visual com clusters, tendencias e plano de regressão</p>
+                </div>                                
+                <div>{{grafico|safe}}</div>
+                <br
+                <div>
+                    <h1><a href="/">Voltar</a></h1>
+                    <p>Feito com carinho por Cláudio ontes ♥</p>
+                </div>
+            </div>
+            </body>
+        </html>
+    ''', grafico=graph_html)
+
 
 if __name__ == '__main__':
     init_db()
@@ -275,4 +517,4 @@ if __name__ == '__main__':
         debug=config.FLASK_DEBUG,  
         threaded=config.FLASK_THREADED,
         use_reloader=config.FLASK_USE_RELOADER
-        )
+    )
