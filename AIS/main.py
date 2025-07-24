@@ -33,10 +33,6 @@ def init_db():
         ''')
         conn.commit()
 
-# Em breve
-vazio = 0
-
-
 #Rotas
 @app.route('/')
 def index():
