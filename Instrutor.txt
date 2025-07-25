@@ -36,3 +36,6 @@ https://leetcode.com/
 https://www.kaggle.com/
 
 https://pt.khanacademy.org/
+
+https://veduca.org/
+
