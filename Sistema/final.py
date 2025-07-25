@@ -4,6 +4,7 @@ import plotly.express as px
 import dash
 from dash import dcc, html
 from dash.dependencies import Input, Output
+import os
 
 # Etapa 1: carregar e limpar os dados
 def load_data(file_path):
@@ -24,8 +25,9 @@ def load_data(file_path):
         return None
 
 # Carregar os CSVs
-avengers_df = load_data('avengers.csv')
-drinks_df = load_data('drinks.csv')
+script_dir = os.path.dirname(os.path.abspath(__file__))
+avengers_df = load_data(os.path.join(script_dir, 'avengers.csv'))
+drinks_df = load_data(os.path.join(script_dir, 'drinks.csv'))
 
 # Etapa 2: Limpeza dos dados
 def clean_data(df, numeric_columns):

@@ -10,12 +10,10 @@ pio.renderers.default = "browser"
 
 #carregar o drinks.csv
 df = pd.read_csv("drinks.csv")
-#df_avengers = pd.read_csv("avengers.csv")
 
 #cria o banco de dados em sql e popular com os dados do arquivo csv
 conn = sqlite3.connect("consumo_alcool.db")
 df.to_sql("drinks", conn, if_exists="replace", index=False)
-#df_avengers.to_sql("Vingadores", conn, if_exists="replace", index=False)
 conn.commit()
 conn.close()
 
