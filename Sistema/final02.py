@@ -4,12 +4,14 @@ import sqlite3
 import plotly.express as px
 import plotly.io as pio
 import random
+import os
 
 #configura o plotly para abrir os arquivos no navegador por padrão
 pio.renderers.default = "browser"
 
 #carregar o drinks.csv
-df = pd.read_csv("drinks.csv")
+script_dir = os.path.dirname(os.path.abspath(__file__))
+df = pd.read_csv(os.path.join(script_dir, 'drinks.csv'))
 
 #cria o banco de dados em sql e popular com os dados do arquivo csv
 conn = sqlite3.connect("consumo_alcool.db")
@@ -52,7 +54,7 @@ def grafico1():
         y="total_litres_of_pure_alcohol",
         title="Top 10 paises com maior consumo de Alcool"
     )
-    return fig.to_html()
+    return fig.to_html() + "<br/><h1><a href='/'>Voltar ao Inicio</a></h1>"
 
 # media do consumo por tipo global
 @app.route('/grafico2')
@@ -62,7 +64,7 @@ def grafico2():
     conn.close()
     df_melted = df.melt(var_name="Bebidas", value_name="Média de Porções")
     fig = px.bar(df_melted, x="Bebidas", y="Média de Porções", title="Media de consumo global por tipo")
-    return fig.to_html()
+    return fig.to_html() + "<br/><h1><a href='/'>Voltar ao Inicio</a></h1>"
 
 @app.route('/grafico3')
 def grafico3():
@@ -133,6 +135,7 @@ def comparar():
             </select><br><br>
             <input type="submit" value=" - Comparar - ">
         </form>
+        <br/><h1><a href='/'>Voltar ao Inicio</a></h1>
     ''', opcoes=opcoes)
 
 # inicia o servidor flask
