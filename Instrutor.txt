@@ -30,3 +30,9 @@ discord do instrutor caio: caioross_
 whats: 11 95272-9677
 email: kio199@gmail.com
 site: caioross.github.io
+
+https://leetcode.com/
+
+https://www.kaggle.com/
+
+https://pt.khanacademy.org/

@@ -44,3 +44,4 @@ print(avengers_df.head())
 print('\nDrinks Dataframe após a limpeza')
 print(drinks_df.head())
                 
+
